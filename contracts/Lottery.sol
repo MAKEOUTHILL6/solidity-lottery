@@ -6,8 +6,10 @@ import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
 
 error Lottery__NotEnoughETHEntered();
+error Lottery__TransferFailed();
 
 contract Lottery is VRFConsumerBaseV2 {
+    
     // State Variables
     uint256 private immutable i_entranceFee;
     address payable[] private s_participants;
@@ -17,9 +19,14 @@ contract Lottery is VRFConsumerBaseV2 {
     uint32 private immutable i_callbackGasLimit;
     uint16 private constant REQUEST_CONFIRMATIONS = 3;
     uint32 private constant NUM_WORDS = 1;
-    // Events
 
+    // Lottery Variables
+    address private s_recentWinner;
+
+    // Events
     event RaffleEnter(address indexed participant);
+    event RequestRaffleWinner(uint256 indexed requestId);
+    event WinnerPicked(address indexed winner);
 
     constructor(
         address vrfCoordinatorV2,
@@ -46,19 +53,33 @@ contract Lottery is VRFConsumerBaseV2 {
     }
 
     function pickRandomWinner() external {
-        i_vrfCoordinator.requestRandomWords(
+        uint256 requestId = i_vrfCoordinator.requestRandomWords(
             i_gasLane,
             i_subscriptionId,
             REQUEST_CONFIRMATIONS,
             i_callbackGasLimit,
             NUM_WORDS
         );
+        emit RequestRaffleWinner(requestId);
     }
 
     function fulfillRandomWords(
-        uint256 requestId,
+        uint256 /*requestId*/,
         uint256[] memory randomWords
-    ) internal override {}
+    ) internal override {
+        uint256 indexOfWinner = randomWords[0] % s_participants.length;
+        address payable winner = s_participants[indexOfWinner];
+        s_recentWinner = winner;
+        //send money to the winner
+        (bool success, ) = s_recentWinner.call{value: address(this).balance}(
+            ""
+        );
+        // require
+        if (!success) {
+            revert Lottery__TransferFailed();
+        }
+        emit WinnerPicked(winner);
+    }
 
     // View / Pure Functions
     function getEntranceFee() public view returns (uint256) {
@@ -69,5 +90,9 @@ contract Lottery is VRFConsumerBaseV2 {
         uint256 index
     ) public view returns (address) {
         return s_participants[index];
+    }
+
+    function getRecentWinner() public view returns (address) {
+        return s_recentWinner;
     }
 }
