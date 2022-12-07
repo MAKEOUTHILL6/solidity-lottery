@@ -26,7 +26,7 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
     enum LotteryState {
         OPEN,
         CALCULATING
-    }
+    } // returns uint256 0 = OPEN, 1 = CALCULATING
 
     // State Variables
     uint256 private immutable i_entranceFee;
@@ -97,6 +97,7 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
         bool hasPlayers = (s_participants.length > 0);
         bool hasBalance = address(this).balance > 0;
         upkeepNeeded = (isOpen && timePassed && hasPlayers && hasBalance);
+        return (upkeepNeeded, "0x0");
     }
 
     /**
@@ -151,6 +152,10 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
         return i_entranceFee;
     }
 
+    function getInterval() public view returns (uint256) {
+        return i_interval;
+    }
+
     function getParticipantByIndex(
         uint256 index
     ) public view returns (address) {
@@ -161,7 +166,7 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
         return s_recentWinner;
     }
 
-    function getRaffleState() public view returns (LotteryState) {
+    function getLotteryState() public view returns (LotteryState) {
         return s_lotteryState;
     }
 
