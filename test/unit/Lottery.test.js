@@ -60,7 +60,7 @@ developmentChains.includes(network.name)
 
           await network.provider.request({ method: "evm_mine", params: [] });
           // fake a perfrom
-          await lottery.performUpkeep([]); 
+          await lottery.performUpkeep([]);
           console.log("After state" + (await lottery.getLotteryState()));
           await expect(
             lottery.enterRaffle({ value: lotteryEntranceFee })
@@ -157,8 +157,66 @@ developmentChains.includes(network.name)
         });
 
         it("can only perform after performUpkeep", async () => {
-          await expect(vrfCoordinatorV2Mock.fulfillRandomWords(0, lottery.address)).to.be.revertedWith("nonexistent request");
-          await expect(vrfCoordinatorV2Mock.fulfillRandomWords(1, lottery.address)).to.be.revertedWith("nonexistent request");
+          await expect(
+            vrfCoordinatorV2Mock.fulfillRandomWords(0, lottery.address)
+          ).to.be.revertedWith("nonexistent request");
+          await expect(
+            vrfCoordinatorV2Mock.fulfillRandomWords(1, lottery.address)
+          ).to.be.revertedWith("nonexistent request");
+        });
+
+        it("picks a winner, resets the lottery and sends money", async () => {
+          const additionalEntrants = 3;
+          const startingAccountIndex = 1; // deployer = 0
+          const accounts = await ethers.getSigners();
+
+          for (
+            let i = startingAccountIndex;
+            i < additionalEntrants + startingAccountIndex;
+            i++
+          ) {
+            const accountConnectedLottery = lottery.connect(accounts[i]);
+            await accountConnectedLottery.enterRaffle({
+              value: lotteryEntranceFee,
+            });
+          }
+          const startingTimeStamp = await lottery.getLatestTimeStamp();
+
+          await new Promise(async (resolve, reject) => {
+            lottery.once("WinnerPicked", async () => {
+              console.log("Event found!");
+              try {
+                const recentWinner = await lottery.getRecentWinner();
+                const raffleState = await lottery.getLotteryState();
+                const endingTimeStamp = await lottery.getLatestTimeStamp();
+                const numPlayers = await lottery.getNumberOfPlayers();
+                const winnerEndingBalance = await accounts[1].getBalance();
+                assert.equal(numPlayers.toString(), "0");
+                assert.equal(raffleState.toString(), "0");
+                assert(endingTimeStamp > startingTimeStamp);
+                assert.equal(
+                  winnerEndingBalance.toString(),
+                  winnerStartingBalance.add(
+                    lotteryEntranceFee
+                      .mul(additionalEntrants)
+                      .add(lotteryEntranceFee)
+                      .toString()
+                  )
+                );
+              } catch (error) {
+                reject(error);
+              }
+              resolve();
+            });
+
+            const tx = await lottery.performUpkeep([]);
+            const txReceipt = await tx.wait(1);
+            const winnerStartingBalance = await accounts[1].getBalance();
+            await vrfCoordinatorV2Mock.fulfillRandomWords(
+              txReceipt.events[1].args.requestId,
+              lottery.address
+            );
+          });
         });
       });
     })
