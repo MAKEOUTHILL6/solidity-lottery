@@ -122,7 +122,7 @@ developmentChains.includes(network.name)
           ]);
           await network.provider.request({ method: "evm_mine", params: [] });
           const tx = await lottery.performUpkeep([]);
-          assert.equal(tx);
+          assert(tx);
         });
 
         it("reverts when chekUpkeep is false", async () => {
@@ -143,7 +143,7 @@ developmentChains.includes(network.name)
           const requestId = txReceipt.events[1].args.requestId;
           const raffleState = await lottery.getLotteryState();
           assert(requestId.toNumber() > 0);
-          assert(raffleState.toNumber() == 1);
+          assert(raffleState.toString() == "1");
         });
       });
 
