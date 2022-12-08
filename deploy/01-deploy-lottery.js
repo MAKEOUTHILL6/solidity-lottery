@@ -33,16 +33,18 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
   const callbackGasLimit = networkConfig[chainId]["callbackGasLimit"];
   const interval = networkConfig[chainId]["interval"];
 
+  const arguments = [
+    VRFCoordinatorV2Address,
+    entranceFee,
+    gasLane,
+    subscriptionId,
+    callbackGasLimit,
+    interval,
+  ];
+
   const lottery = await deploy("Lottery", {
     from: deployer,
-    args: [
-      VRFCoordinatorV2Address,
-      entranceFee,
-      gasLane,
-      subscriptionId,
-      callbackGasLimit,
-      interval,
-    ],
+    args: arguments,
     log: true,
     waitConfirmations: network.config.blockConfirmations || 1,
   });
@@ -60,7 +62,7 @@ module.exports = async function ({ getNamedAccounts, deployments }) {
     process.env.ETHERSCAN_API_KEY
   ) {
     console.log("Verifying...");
-    await verify(lottery.address, args);
+    await verify(lottery.address, arguments);
   }
 
   console.log("...................................");

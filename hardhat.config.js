@@ -30,11 +30,17 @@ module.exports = {
   solidity: "0.8.17",
 
   gasReporter: {
-    enabled: false,
+    enabled: true,
     outputFile: "gas-report.txt",
     noColors: true,
     currency: "USD",
     coinmarketcap: COINMARKETCAP_API_KEY,
+  },
+
+  etherscan: {
+    apiKey: {
+      goerli: ETHERSCAN_API_KEY,
+    },
   },
 
   // getNamedAccounts()
@@ -48,6 +54,6 @@ module.exports = {
   },
 
   mocha: {
-    timeout: 300000, // 300 seconds max
+    timeout: 500000, // 500 seconds max
   },
 };
