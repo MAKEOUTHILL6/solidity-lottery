@@ -60,7 +60,7 @@ developmentChains.includes(network.name)
 
           await network.provider.request({ method: "evm_mine", params: [] });
           // fake a perfrom
-          await lottery.performUpkeep([]); // Error: VM Exception while processing transaction: reverted with custom error 'InvalidConsumer()'
+          await lottery.performUpkeep([]); 
           console.log("After state" + (await lottery.getLotteryState()));
           await expect(
             lottery.enterRaffle({ value: lotteryEntranceFee })
@@ -86,7 +86,7 @@ developmentChains.includes(network.name)
             interval.toNumber() + 1,
           ]);
           await network.provider.request({ method: "evm_mine", params: [] });
-          await lottery.performUpkeep("0x"); // Error: VM Exception while processing transaction: reverted with custom error 'InvalidConsumer()
+          await lottery.performUpkeep("0x");
           const lotteryState = await lottery.getLotteryState();
           const { upkeepNeeded } = await lottery.callStatic.checkUpkeep([]);
           assert.equal(lotteryState.toString(), "1");
@@ -111,6 +111,54 @@ developmentChains.includes(network.name)
           await network.provider.request({ method: "evm_mine", params: [] });
           const { upkeepNeeded } = await lottery.callStatic.checkUpkeep("0x"); // upkeepNeeded = (timePassed && isOpen && hasBalance && hasPlayers)
           assert(upkeepNeeded);
+        });
+      });
+
+      describe("performUpkeep", () => {
+        it("can only run if checkUpkeep is true", async () => {
+          await lottery.enterRaffle({ value: lotteryEntranceFee });
+          await network.provider.send("evm_increaseTime", [
+            interval.toNumber() + 1,
+          ]);
+          await network.provider.request({ method: "evm_mine", params: [] });
+          const tx = await lottery.performUpkeep([]);
+          assert.equal(tx);
+        });
+
+        it("reverts when chekUpkeep is false", async () => {
+          await expect(lottery.performUpkeep([])).to.be.revertedWith(
+            "Lottery__InvalidUpkeep"
+          );
+        });
+
+        it("upadates the lottery state, emits event, and calls the vrf coordinator", async () => {
+          await lottery.enterRaffle({ value: lotteryEntranceFee });
+          await network.provider.send("evm_increaseTime", [
+            interval.toNumber() + 1,
+          ]);
+          await network.provider.request({ method: "evm_mine", params: [] });
+
+          const tx = await lottery.performUpkeep([]);
+          const txReceipt = await tx.wait(1);
+          const requestId = txReceipt.events[1].args.requestId;
+          const raffleState = await lottery.getLotteryState();
+          assert(requestId.toNumber() > 0);
+          assert(raffleState.toNumber() == 1);
+        });
+      });
+
+      describe("fulfillRandomWords", () => {
+        beforeEach(async () => {
+          await lottery.enterRaffle({ value: lotteryEntranceFee });
+          await network.provider.send("evm_increaseTime", [
+            interval.toNumber() + 1,
+          ]);
+          await network.provider.request({ method: "evm_mine", params: [] });
+        });
+
+        it("can only perform after performUpkeep", async () => {
+          await expect(vrfCoordinatorV2Mock.fulfillRandomWords(0, lottery.address)).to.be.revertedWith("nonexistent request");
+          await expect(vrfCoordinatorV2Mock.fulfillRandomWords(1, lottery.address)).to.be.revertedWith("nonexistent request");
         });
       });
     })

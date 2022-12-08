@@ -4,7 +4,7 @@ pragma solidity 0.8.17;
 
 import "@chainlink/contracts/src/v0.8/VRFConsumerBaseV2.sol";
 import "@chainlink/contracts/src/v0.8/interfaces/VRFCoordinatorV2Interface.sol";
-import "@chainlink/contracts/src/v0.8/interfaces/KeeperCompatibleInterface.sol";
+import "@chainlink/contracts/src/v0.8/interfaces/AutomationCompatibleInterface.sol";
 
 error Lottery__NotEnoughETHEntered();
 error Lottery__TransferFailed();
@@ -21,7 +21,7 @@ error Lottery__InvalidUpkeep(
  * @dev This smart contract implements Chainlink VRF V2 and Chainlink Keepers
  */
 
-contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
+contract Lottery is VRFConsumerBaseV2, AutomationCompatibleInterface {
     // Types
     enum LotteryState {
         OPEN,
@@ -29,8 +29,6 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
     } // returns uint256 0 = OPEN, 1 = CALCULATING
 
     // State Variables
-    uint256 private immutable i_entranceFee;
-    address payable[] private s_participants;
     VRFCoordinatorV2Interface private immutable i_vrfCoordinator;
     bytes32 private immutable i_gasLane;
     uint64 private immutable i_subscriptionId;
@@ -43,6 +41,9 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
     LotteryState private s_lotteryState;
     uint256 private s_lastTimeStamp;
     uint256 private immutable i_interval;
+    uint256 private immutable i_entranceFee;
+    address payable[] private s_participants;
+
 
     // Events
     event RaffleEnter(address indexed participant);
@@ -131,20 +132,20 @@ contract Lottery is VRFConsumerBaseV2, KeeperCompatibleInterface {
         uint256[] memory randomWords
     ) internal override {
         uint256 indexOfWinner = randomWords[0] % s_participants.length;
-        address payable winner = s_participants[indexOfWinner];
-        s_recentWinner = winner;
+        address payable recentWinner = s_participants[indexOfWinner];
+        s_recentWinner = recentWinner;
         s_lotteryState = LotteryState.OPEN;
         s_participants = new address payable[](0);
         s_lastTimeStamp = block.timestamp;
         //send money to the winner
-        (bool success, ) = s_recentWinner.call{value: address(this).balance}(
+        (bool success, ) = recentWinner.call{value: address(this).balance}(
             ""
         );
         // require
         if (!success) {
             revert Lottery__TransferFailed();
         }
-        emit WinnerPicked(winner);
+        emit WinnerPicked(recentWinner);
     }
 
     // View / Pure Functions
